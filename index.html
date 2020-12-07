@@ -11,106 +11,138 @@
   <!-- https://habr.com/ru/post/494810/ -->
   <body> 
     <script src="js/build/three.js"></script>
-    <script type="module" >
-        import * as THREE from '/js/build/three.module.js';
-        import {OrbitControls} from 'https://threejsfundamentals.org/threejs/resources/threejs/r122/examples/jsm/controls/OrbitControls.js';
-        import {OBJLoader2} from '/js/examples/jsm/loaders/OBJLoader2.js';
+    <script type="module">
 
-function main() {
-  const canvas = document.querySelector('#c');
-  const renderer = new THREE.WebGLRenderer({canvas});
+		import * as THREE from '/js/build/three.module.js';
 
-  const fov = 45;
-  const aspect = 2;  // the canvas default
-  const near = 0.1;
-  const far = 100;
-  const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-  camera.position.set(0, 10, 20);
+		import { DDSLoader } from '/js/examples/jsm/loaders/DDSLoader.js';
+		import { MTLLoader } from '/js/examples/jsm/loaders/MTLLoader.js';
+		import { OBJLoader } from '/js/examples/jsm/loaders/OBJLoader.js';
 
-  const controls = new OrbitControls(camera, canvas);
-  controls.target.set(0, 5, 0);
-  controls.update();
+		let camera, scene, renderer;
 
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color('black');
+		let mouseX = 0, mouseY = 0;
 
-  {
-    const planeSize = 40;
-
-    const loader = new THREE.TextureLoader();
-    const texture = loader.load('https://threejsfundamentals.org/threejs/resources/images/checker.png');
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.magFilter = THREE.NearestFilter;
-    const repeats = planeSize / 2;
-    texture.repeat.set(repeats, repeats);
-
-    const planeGeo = new THREE.PlaneBufferGeometry(planeSize, planeSize);
-    const planeMat = new THREE.MeshPhongMaterial({
-      map: texture,
-      side: THREE.DoubleSide,
-    });
-    const mesh = new THREE.Mesh(planeGeo, planeMat);
-    mesh.rotation.x = Math.PI * -.5;
-    scene.add(mesh);
-  }
-
-  {
-    const skyColor = 0xB1E1FF;  // light blue
-    const groundColor = 0xB97A20;  // brownish orange
-    const intensity = 1;
-    const light = new THREE.HemisphereLight(skyColor, groundColor, intensity);
-    scene.add(light);
-  }
-
-  {
-    const color = 0xFFFFFF;
-    const intensity = 1;
-    const light = new THREE.DirectionalLight(color, intensity);
-    light.position.set(0, 10, 0);
-    light.target.position.set(-5, 0, 0);
-    scene.add(light);
-    scene.add(light.target);
-  }
-
-  {
-    const objLoader = new OBJLoader2();
-    objLoader.load('/models/modern chair 11 obj.obj', (root) => {
-      scene.add(root);
-    });
-  }
-
-  function resizeRendererToDisplaySize(renderer) {
-    const canvas = renderer.domElement;
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    const needResize = canvas.width !== width || canvas.height !== height;
-    if (needResize) {
-      renderer.setSize(width, height, false);
-    }
-    return needResize;
-  }
-
-  function render() {
-
-    if (resizeRendererToDisplaySize(renderer)) {
-      const canvas = renderer.domElement;
-      camera.aspect = canvas.clientWidth / canvas.clientHeight;
-      camera.updateProjectionMatrix();
-    }
-
-    renderer.render(scene, camera);
-
-    requestAnimationFrame(render);
-  }
-
-  requestAnimationFrame(render);
-}
-
-main();
+		let windowHalfX = window.innerWidth / 2;
+		let windowHalfY = window.innerHeight / 2;
 
 
-    </script>
-    <canvas id="c"></canvas>
+		init();
+		animate();
+
+
+		function init() {
+
+			const container = document.createElement( 'div' );
+			document.body.appendChild( container );
+
+			camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 2000 );
+			camera.position.z = 350;
+
+			// scene
+
+			scene = new THREE.Scene();
+
+			const ambientLight = new THREE.AmbientLight( 0xcccccc, 0.4 );
+			scene.add( ambientLight );
+
+			const pointLight = new THREE.PointLight( 0xffffff, 0.8 );
+			camera.add( pointLight );
+			scene.add( camera );
+
+			// model
+
+			const onProgress = function ( xhr ) {
+
+				if ( xhr.lengthComputable ) {
+
+					const percentComplete = xhr.loaded / xhr.total * 100;
+					console.log( Math.round( percentComplete, 2 ) + '% downloaded' );
+
+				}
+
+			};
+
+			const onError = function () { };
+
+			const manager = new THREE.LoadingManager();
+			manager.addHandler( /\.dds$/i, new DDSLoader() );
+
+			// comment in the following line and import TGALoader if your asset uses TGA textures
+			// manager.addHandler( /\.tga$/i, new TGALoader() );
+
+			new MTLLoader( manager )
+				.setPath( 'models/' )
+				.load( 'modern chair 11 obj.mtl', function ( materials ) {
+
+					materials.preload();
+
+					new OBJLoader( manager )
+						.setMaterials( materials )
+						.setPath( 'models/' )
+						.load( 'modern chair 11 obj.obj', function ( object ) {
+
+							object.position.y = - 55;
+							scene.add( object );
+
+						}, onProgress, onError );
+
+				} );
+
+			//
+
+			renderer = new THREE.WebGLRenderer();
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			container.appendChild( renderer.domElement );
+
+			document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+
+			//
+
+			window.addEventListener( 'resize', onWindowResize, false );
+
+		}
+
+		function onWindowResize() {
+
+			windowHalfX = window.innerWidth / 2;
+			windowHalfY = window.innerHeight / 2;
+
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+
+			renderer.setSize( window.innerWidth, window.innerHeight );
+
+		}
+
+		function onDocumentMouseMove( event ) {
+
+			mouseX = ( event.clientX - windowHalfX ) / 2;
+			mouseY = ( event.clientY - windowHalfY ) / 2;
+
+		}
+
+		//
+
+		function animate() {
+
+			requestAnimationFrame( animate );
+			render();
+
+		}
+
+		function render() {
+
+			camera.position.x += ( mouseX - camera.position.x ) * .05;
+			camera.position.y += ( - mouseY - camera.position.y ) * .05;
+
+			camera.lookAt( scene.position );
+
+			renderer.render( scene, camera );
+
+		}
+
+	</script>
   </body>
 </html>
